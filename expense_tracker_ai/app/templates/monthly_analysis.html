@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Analysis | Expense Tracker AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <div>
+                <p class="eyebrow">Monthly Expense Analysis</p>
+                <h1>Month-by-Month Spending Trace</h1>
+                <p class="hero-copy">
+                    Review each tracked month with spending totals, trends, category leaders, and budget performance.
+                </p>
+                <div class="hero-actions">
+                    <a href="{{ url_for('dashboard') }}" class="ghost-button">Back to Dashboard</a>
+                </div>
+            </div>
+            <div class="hero-accent">
+                <span>{{ stats.tracked_months }} tracked months</span>
+                <span>Latest: {{ stats.latest_month }}</span>
+                <span>Highest spend: {{ stats.highest_month }}</span>
+            </div>
+        </header>
+
+        <section class="panel monthly-trace-panel">
+            <div class="panel-header">
+                <h2>Monthly Expense Trace</h2>
+                <p>Every month is analyzed individually so you can spot changes in spending behavior over time.</p>
+            </div>
+            <div class="table-wrap analysis-table-wrap">
+                <table class="analysis-table">
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Total Expense</th>
+                            <th>Expenses</th>
+                            <th>Average</th>
+                            <th>Top Category</th>
+                            <th>Budget</th>
+                            <th>Under Budget</th>
+                            <th>Remaining</th>
+                            <th>Over Budget</th>
+                            <th>Usage</th>
+                            <th>Balance</th>
+                            <th>Trend</th>
+                            <th>Alert</th>
+                            <th>Analysis</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trace in monthly_traces %}
+                        <tr>
+                            <td>
+                                <strong>{{ trace.label }}</strong>
+                            </td>
+                            <td>{{ trace.total_display }}</td>
+                            <td>{{ trace.expense_count }}</td>
+                            <td>{{ trace.average_expense_display }}</td>
+                            <td>{{ trace.top_category }}</td>
+                            <td>{{ trace.budget_display }}</td>
+                            <td>
+                                {% if trace.has_budget %}
+                                {{ trace.expense_within_budget_display }}
+                                {% else %}
+                                No budget
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if trace.has_budget %}
+                                <span class="positive">{{ trace.remaining_budget_display }}</span>
+                                {% else %}
+                                No budget
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if trace.has_budget %}
+                                <span class="{% if trace.exceeded_budget > 0 %}negative{% endif %}">
+                                    {{ trace.exceeded_budget_display }}
+                                </span>
+                                {% else %}
+                                No budget
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if trace.has_budget %}
+                                <span class="usage-chip {% if trace.budget_usage_percent >= 100 %}negative{% elif trace.budget_usage_percent >= 80 %}warning-text{% else %}positive{% endif %}">
+                                    {{ "%.1f"|format(trace.budget_usage_percent) }}%
+                                </span>
+                                {% else %}
+                                No budget
+                                {% endif %}
+                            </td>
+                            <td class="{{ trace.status }}">{{ trace.balance_display }}</td>
+                            <td>
+                                {% if trace.trend == "up" %}
+                                <span class="trend-chip negative">Up {{ trace.change_amount_display }} ({{ "%.1f"|format(trace.change_percent) }}%)</span>
+                                {% elif trace.trend == "down" %}
+                                <span class="trend-chip positive">Down {{ trace.change_amount_display }} ({{ "%.1f"|format(trace.change_percent) }}%)</span>
+                                {% elif trace.trend == "flat" %}
+                                <span class="trend-chip neutral">No change</span>
+                                {% else %}
+                                <span class="trend-chip neutral">First month</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="alert-box {{ trace.alert_level }}">{{ trace.alert_message }}</div>
+                            </td>
+                            <td class="analysis-text-cell">{{ trace.analysis }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="14" class="empty-state">No monthly trace is available yet. Add some expenses to start analysis.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

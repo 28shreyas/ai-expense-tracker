@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <div>
+                <p class="eyebrow">Personal Finance Dashboard</p>
+                <h1>Expense Tracker AI</h1>
+                <p class="hero-copy">
+                    Track your spending, review monthly patterns, and get quick AI-style suggestions from your expense history.
+                </p>
+                <div class="hero-actions">
+                    <a href="{{ url_for('monthly_analysis') }}" class="primary-button">Open Monthly Analysis</a>
+                </div>
+            </div>
+            <div class="hero-accent">
+                <span>CSV powered</span>
+                <span>Flask app</span>
+                <span>Responsive UI</span>
+            </div>
+        </header>
+
+        {% if error %}
+        <section class="message error">{{ error }}</section>
+        {% endif %}
+        {% if budget_error %}
+        <section class="message error">{{ budget_error }}</section>
+        {% endif %}
+        {% if budget_success %}
+        <section class="message success">{{ budget_success }}</section>
+        {% endif %}
+        {% if report_error %}
+        <section class="message error">{{ report_error }}</section>
+        {% endif %}
+        {% if delete_error %}
+        <section class="message error">{{ delete_error }}</section>
+        {% endif %}
+        {% if report_success %}
+        <section class="message success">{{ report_success }}</section>
+        {% endif %}
+        {% if request.args.get("saved") == "1" %}
+        <section class="message success">Expense saved successfully.</section>
+        {% endif %}
+        {% if expense_updated %}
+        <section class="message success">{{ expense_updated }}</section>
+        {% endif %}
+        {% if expense_deleted %}
+        <section class="message success">{{ expense_deleted }}</section>
+        {% endif %}
+        {% if archive_summary.archived_count %}
+        <section class="message success">
+            {{ archive_summary.archived_count }} old expense{% if archive_summary.archived_count != 1 %}s were{% else %} was{% endif %}
+            archived into yearly report{% if archive_summary.archived_years|length != 1 %}s{% endif %}
+            for {{ archive_summary.archived_years|join(", ") }}.
+        </section>
+        {% endif %}
+
+        <section class="stats-grid">
+            <article class="stat-card">
+                <span>Total Spend</span>
+                <strong>{{ stats.total }}</strong>
+            </article>
+            <article class="stat-card">
+                <span>Entries</span>
+                <strong>{{ stats.count }}</strong>
+            </article>
+            <article class="stat-card">
+                <span>Top Category</span>
+                <strong>{{ stats.top_category }}</strong>
+            </article>
+            <article class="stat-card">
+                <span>Latest Month</span>
+                <strong>{{ stats.latest_month }}</strong>
+            </article>
+        </section>
+
+        <main class="dashboard-grid">
+            <section class="panel form-panel">
+                <div class="panel-header">
+                    <h2>{% if edit_expense_id %}Edit Expense{% else %}Add Expense{% endif %}</h2>
+                    <p>{% if edit_expense_id %}Update the selected expense entry.{% else %}Save a new expense entry to your tracker.{% endif %}</p>
+                </div>
+                <form action="{% if edit_expense_id %}{{ url_for('edit_expense', expense_id=edit_expense_id|int) }}{% else %}{{ url_for('add_expense') }}{% endif %}" method="post" class="expense-form">
+                    <label>
+                        <span>Date</span>
+                        <input type="date" name="date" value="{{ form_data.date }}" required>
+                    </label>
+                    <label>
+                        <span>Category</span>
+                        <input type="text" name="category" value="{{ form_data.category }}" placeholder="Food, Travel, Bills" required>
+                    </label>
+                    <label>
+                        <span>Amount</span>
+                        <input type="number" name="amount" value="{{ form_data.amount }}" min="0.01" step="0.01" placeholder="0.00" required>
+                    </label>
+                    <label>
+                        <span>Description</span>
+                        <input type="text" name="description" value="{{ form_data.description }}" placeholder="Lunch, rent, fuel">
+                    </label>
+                    <div class="form-actions">
+                        <button type="submit" class="primary-button">{% if edit_expense_id %}Update Expense{% else %}Save Expense{% endif %}</button>
+                        {% if edit_expense_id %}
+                        <a href="{{ url_for('dashboard') }}" class="ghost-button">Cancel</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </section>
+
+            <section class="panel insights-panel">
+                <div class="panel-header">
+                    <h2>AI Insights</h2>
+                    <p>Quick observations generated from your saved expenses.</p>
+                </div>
+                <div class="insight-list">
+                    {% for line in insights %}
+                    <p>{{ line }}</p>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="panel table-panel">
+                <div class="panel-header panel-header-inline">
+                    <div>
+                        <h2>Expense History</h2>
+                        <p>Browse your latest entries or filter by category.</p>
+                    </div>
+                    <form action="{{ url_for('filter_expenses') }}" method="post" class="filter-form">
+                        <input type="text" name="category" value="{{ filter_value }}" placeholder="Filter category">
+                        <button type="submit" class="secondary-button">Apply</button>
+                        <a href="{{ url_for('dashboard') }}" class="ghost-button">Clear</a>
+                    </form>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for expense in expenses %}
+                            <tr>
+                                <td>{{ expense.date }}</td>
+                                <td>{{ expense.category }}</td>
+                                <td>{{ summarize_currency(expense.amount) }}</td>
+                                <td>{{ expense.description or "-" }}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        <a href="{{ url_for('dashboard', edit=expense.id) }}" class="table-action-link">Edit</a>
+                                        <form action="{{ url_for('remove_expense', expense_id=expense.id) }}" method="post" class="inline-action-form">
+                                            <button type="submit" class="table-action-button danger-action" onclick="return confirm('Remove this expense entry?')">Remove</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="empty-state">No expenses found yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel analytics-panel">
+                <div class="panel-header panel-header-inline">
+                    <div>
+                    <h2>Analytics Snapshot</h2>
+                    <p>Category and month totals pulled directly from your CSV data.</p>
+                    </div>
+                    <a href="{{ url_for('monthly_analysis') }}" class="ghost-button">View Full Monthly Analysis</a>
+                </div>
+                <div class="analytics-block">
+                    <h3>By Category</h3>
+                    <ul>
+                        {% for category, amount in category_breakdown %}
+                        <li><span>{{ category }}</span><strong>{{ summarize_currency(amount) }}</strong></li>
+                        {% else %}
+                        <li><span>No category data yet</span><strong>-</strong></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="analytics-block">
+                    <h3>By Month</h3>
+                    <ul>
+                        {% for month, amount in monthly_breakdown %}
+                        <li><span>{{ month }}</span><strong>{{ summarize_currency(amount) }}</strong></li>
+                        {% else %}
+                        <li><span>No monthly data yet</span><strong>-</strong></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </section>
+
+            <section class="panel dashboard-budget-panel">
+                <div class="panel-header panel-header-inline">
+                    <div>
+                        <h2>Monthly Budget Calculation</h2>
+                        <p>Check each month's expense against the fixed budget directly from the dashboard.</p>
+                    </div>
+                    <a href="{{ url_for('monthly_analysis') }}" class="ghost-button">Open Full Monthly Analysis</a>
+                </div>
+                <div class="table-wrap analysis-table-wrap">
+                    <table class="analysis-table compact-analysis-table">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Budget</th>
+                                <th>Expense</th>
+                                <th>Under Budget</th>
+                                <th>Remaining</th>
+                                <th>Over Budget</th>
+                                <th>Usage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trace in monthly_budget_rows %}
+                            <tr>
+                                <td><strong>{{ trace.label }}</strong></td>
+                                <td>{{ trace.budget_display }}</td>
+                                <td>{{ trace.total_display }}</td>
+                                <td>
+                                    {% if trace.has_budget %}
+                                    {{ trace.expense_within_budget_display }}
+                                    {% else %}
+                                    No budget
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if trace.has_budget %}
+                                    <span class="positive">{{ trace.remaining_budget_display }}</span>
+                                    {% else %}
+                                    No budget
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if trace.has_budget %}
+                                    <span class="{% if trace.exceeded_budget > 0 %}negative{% endif %}">{{ trace.exceeded_budget_display }}</span>
+                                    {% else %}
+                                    No budget
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if trace.has_budget %}
+                                    <span class="usage-chip {% if trace.budget_usage_percent >= 100 %}negative{% elif trace.budget_usage_percent >= 80 %}warning-text{% else %}positive{% endif %}">
+                                        {{ "%.1f"|format(trace.budget_usage_percent) }}%
+                                    </span>
+                                    {% else %}
+                                    No budget
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="empty-state">No monthly budget calculation is available yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel reports-panel">
+                <div class="panel-header">
+                    <h2>Yearly Reports</h2>
+                    <p>Old expenses are archived after one year, and you can also create a report manually for any active year.</p>
+                </div>
+                <form action="{{ url_for('generate_report') }}" method="post" class="report-form">
+                    <label>
+                        <span>Select Year</span>
+                        <select name="year" required>
+                            <option value="">-- Choose a year --</option>
+                            {% for year in available_report_years %}
+                            <option value="{{ year }}">{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <button type="submit" class="secondary-button">Generate Yearly Report</button>
+                </form>
+                <div class="table-wrap">
+                    <table class="compact-analysis-table">
+                        <thead>
+                            <tr>
+                                <th>Year</th>
+                                <th>Type</th>
+                                <th>Total Entries</th>
+                                <th>Total Expense</th>
+                                <th>Generated At</th>
+                                <th>File</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for report in reports %}
+                            <tr>
+                                <td><strong>{{ report.year }}</strong></td>
+                                <td>{{ report.report_type }}</td>
+                                <td>{{ report.total_entries }}</td>
+                                <td>{{ summarize_currency(report.total_expense) }}</td>
+                                <td>{{ report.generated_at }}</td>
+                                <td>{{ report.file_name }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="empty-state">No yearly reports have been created yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel monthly-summary-panel">
+                <div class="panel-header">
+                    <h2>Monthly Summary</h2>
+                    <p>View monthly expenses and manage your budget.</p>
+                </div>
+                <form action="{{ url_for('select_month') }}" method="post" class="month-selector-form">
+                    <label>
+                        <span>Select Month</span>
+                        <select name="month" onchange="this.form.submit()">
+                            <option value="">-- Choose a month --</option>
+                            {% for month in monthly_summary.available_months %}
+                            <option value="{{ month }}" {% if monthly_summary.selected_month == month %}selected{% endif %}>{{ month }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </form>
+                
+                {% if monthly_summary.selected_month %}
+                <div class="monthly-header">
+                    <h3>{{ monthly_summary.selected_month }}</h3>
+                </div>
+
+                <!-- Budget Setting Form -->
+                <form action="{{ url_for('set_budget') }}" method="post" class="budget-form">
+                    <input type="hidden" name="month" value="{{ monthly_summary.selected_month }}">
+                    <label>
+                        <span>Monthly Budget</span>
+                        <div class="budget-input-group">
+                            <input type="number" name="budget" value="{{ monthly_summary.budget_amount }}" min="0" step="0.01" placeholder="Set your budget">
+                            <button type="submit" class="secondary-button">💾 Save</button>
+                        </div>
+                    </label>
+                </form>
+
+                <!-- Calculation Display -->
+                <div class="calculation-display">
+                    <div class="calc-row budget-row">
+                        <span class="calc-label">📊 Budget</span>
+                        <strong class="calc-value budget-value">{{ monthly_summary.total_budget }}</strong>
+                    </div>
+                    
+                    <div class="calc-separator">
+                        <span>−</span>
+                    </div>
+                    
+                    <div class="calc-row expense-row">
+                        <span class="calc-label">💰 Expenses</span>
+                        <strong class="calc-value expense-value">{{ monthly_summary.total_expense }}</strong>
+                    </div>
+                    
+                    <div class="calc-separator">
+                        <span>=</span>
+                    </div>
+                    
+                    <div class="balance-display {{ monthly_summary.balance_status }}">
+                        <span class="balance-label">Remaining Balance</span>
+                        <strong class="balance-value">{{ monthly_summary.total_balance }}</strong>
+                        <span class="balance-status-text">
+                            {% if monthly_summary.balance_status == 'positive' %}
+                            ✓ On Track
+                            {% else %}
+                            ⚠ Over Budget
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                {% if monthly_summary.budget_amount > 0 %}
+                <div class="progress-container">
+                    <div class="progress-header">
+                        <span>Budget Usage</span>
+                        <span class="progress-percent">{{ "%.1f"|format(monthly_summary.expense_amount / monthly_summary.budget_amount * 100) }}%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill {% if monthly_summary.expense_amount / monthly_summary.budget_amount >= 1 %}exceeded{% elif monthly_summary.expense_amount / monthly_summary.budget_amount >= 0.8 %}warning{% endif %}" 
+                             style="width: {{ [monthly_summary.expense_amount / monthly_summary.budget_amount * 100, 100]|min }}%"></div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <h3 style="margin-top: 24px; border-top: 1px solid var(--line); padding-top: 16px;">Category Breakdown</h3>
+                <ul class="category-list">
+                    {% for category, amount in monthly_summary.categories %}
+                    <li><span>{{ category }}</span><strong>{{ summarize_currency(amount) }}</strong></li>
+                    {% else %}
+                    <li><span>No expenses this month</span><strong>-</strong></li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p style="text-align: center; color: #666; padding: 20px;">Select a month to view details</p>
+                {% endif %}
+            </section>
+        </main>
+    </div>
+</body>
+</html>

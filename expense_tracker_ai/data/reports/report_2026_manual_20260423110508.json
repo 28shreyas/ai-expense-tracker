@@ -1,0 +1,52 @@
+{
+  "year": "2026",
+  "report_type": "manual",
+  "generated_at": "2026-04-23 11:05:08",
+  "total_entries": 6,
+  "total_expense": 226012.49,
+  "by_category": {
+    "Food": 206012.49,
+    "Travel": 20000.0
+  },
+  "by_month": {
+    "2026-04": 226012.49
+  },
+  "expenses": [
+    {
+      "date": "2026-04-15",
+      "category": "Food",
+      "amount": "12.50",
+      "description": "Lunch"
+    },
+    {
+      "date": "2026-04-16",
+      "category": "Food",
+      "amount": "100000.00",
+      "description": "lunch"
+    },
+    {
+      "date": "2026-04-16",
+      "category": "Travel",
+      "amount": "20000.00",
+      "description": "lokijhgfd"
+    },
+    {
+      "date": "2026-04-16",
+      "category": "Food",
+      "amount": "93999.99",
+      "description": "rent"
+    },
+    {
+      "date": "2026-04-23",
+      "category": "Food",
+      "amount": "2000.00",
+      "description": "lunch"
+    },
+    {
+      "date": "2026-04-23",
+      "category": "Food",
+      "amount": "10000.00",
+      "description": "lunch"
+    }
+  ]
+}
